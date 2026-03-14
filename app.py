@@ -11,11 +11,101 @@ from generate_deck import generate_deck
 # Page config
 # ─────────────────────────────────────────────
 st.set_page_config(
-    page_title="FBO Pitch Deck Generator",
+    page_title="FBO Pitch Deck Generator | Video Growth Systems",
     page_icon="🏠",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# ─────────────────────────────────────────────
+# Branding — Google Fonts + custom CSS
+# ─────────────────────────────────────────────
+st.markdown("""
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+<style>
+    /* Global font */
+    html, body, [class*="css"] {
+        font-family: 'Lato', sans-serif;
+    }
+
+    /* Page headings */
+    h1, h2, h3 {
+        font-family: 'Montserrat', sans-serif !important;
+        font-weight: 800 !important;
+        color: #2C3E50 !important;
+    }
+
+    /* Sidebar header */
+    section[data-testid="stSidebar"] h2 {
+        font-family: 'Montserrat', sans-serif !important;
+        color: #4CAF50 !important;
+    }
+
+    /* Brand header bar */
+    .vgs-header {
+        background-color: #2C3E50;
+        padding: 18px 28px;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+    .vgs-header-brand {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 800;
+        font-size: 1.5rem;
+        color: #4CAF50;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+    .vgs-header-tagline {
+        font-family: 'Lato', sans-serif;
+        font-size: 0.95rem;
+        color: #F2EFE8;
+        margin-top: 2px;
+    }
+    .vgs-divider {
+        border: none;
+        border-top: 3px solid #4CAF50;
+        margin: 0 0 20px 0;
+    }
+
+    /* Primary button */
+    div[data-testid="stButton"] > button[kind="primary"] {
+        background-color: #4CAF50 !important;
+        border: none !important;
+        font-family: 'Montserrat', sans-serif !important;
+        font-weight: 800 !important;
+        letter-spacing: 0.05em !important;
+    }
+    div[data-testid="stButton"] > button[kind="primary"]:hover {
+        background-color: #E67E22 !important;
+    }
+
+    /* Download button */
+    div[data-testid="stDownloadButton"] > button {
+        background-color: #2C3E50 !important;
+        color: #F2EFE8 !important;
+        border: none !important;
+        font-family: 'Lato', sans-serif !important;
+        font-weight: 700 !important;
+    }
+    div[data-testid="stDownloadButton"] > button:hover {
+        background-color: #E67E22 !important;
+    }
+
+    /* Tab styling */
+    button[data-baseweb="tab"] {
+        font-family: 'Lato', sans-serif !important;
+        font-weight: 700 !important;
+    }
+    button[data-baseweb="tab"][aria-selected="true"] {
+        color: #4CAF50 !important;
+        border-bottom-color: #4CAF50 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 BASE_DIR = os.path.dirname(__file__)
 
@@ -63,7 +153,10 @@ def sidebar_summary(data: dict) -> None:
     def fmt(n): return f"${n:,.0f}"
     def pct(n): return f"{n*100:.1f}%"
 
-    st.sidebar.markdown("## 📊 Live Summary")
+    st.sidebar.markdown("""
+<div style="font-family:'Montserrat',sans-serif;font-weight:800;font-size:1rem;color:#4CAF50;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Video Growth Systems</div>
+""", unsafe_allow_html=True)
+    st.sidebar.markdown("## 📊 Deal Summary")
     st.sidebar.markdown(f"**Acquisition:** {fmt(total_acq)}")
     st.sidebar.markdown(f"**Renovation:** {fmt(total_rehab)}")
     st.sidebar.markdown(f"**Holding:** {fmt(total_holding)}")
@@ -83,9 +176,15 @@ def sidebar_summary(data: dict) -> None:
 # ─────────────────────────────────────────────
 # Header
 # ─────────────────────────────────────────────
-st.title("🏠 FBO Pitch Deck Generator")
-st.caption("Choose a design, fill in your deal details, and download your completed presentation in one click.")
-st.divider()
+st.markdown("""
+<div class="vgs-header">
+    <div>
+        <div class="vgs-header-brand">Video Growth Systems</div>
+        <div class="vgs-header-tagline">FBO Pitch Deck Generator — Funded By Others</div>
+    </div>
+</div>
+<hr class="vgs-divider"/>
+""", unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
 # Design selector
@@ -423,7 +522,7 @@ sidebar_summary(data)
 # Generate button
 # ─────────────────────────────────────────────
 st.divider()
-st.subheader("🚀 Generate Your Pitch Deck")
+st.subheader("Generate Your Pitch Deck")
 
 if not os.path.exists(TEMPLATE_PATH):
     st.error(f"⚠️ Template file not found: `{TEMPLATES[selected_design]['file']}`. Make sure all three template files are in the same folder as `app.py`.")
@@ -449,3 +548,10 @@ else:
             "💡 **Next steps:** Download the file, then upload it to Google Slides "
             "(File → Import slides) or open directly in PowerPoint."
         )
+
+st.markdown("""
+<br>
+<div style="text-align:center; font-family:'Lato',sans-serif; font-size:0.8rem; color:#2C3E50; opacity:0.6; padding-top:20px;">
+    Powered by <strong>Video Growth Systems</strong> · videogrowthsystems.com
+</div>
+""", unsafe_allow_html=True)
