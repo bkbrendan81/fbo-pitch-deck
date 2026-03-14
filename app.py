@@ -11,7 +11,7 @@ from generate_deck import generate_deck
 # Page config
 # ─────────────────────────────────────────────
 st.set_page_config(
-    page_title="FBO Pitch Deck Generator | Video Growth Systems",
+    page_title="FBO Pitch Deck Generator | Funded By Others",
     page_icon="🏠",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -154,7 +154,7 @@ def sidebar_summary(data: dict) -> None:
     def pct(n): return f"{n*100:.1f}%"
 
     st.sidebar.markdown("""
-<div style="font-family:'Montserrat',sans-serif;font-weight:800;font-size:1rem;color:#4CAF50;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Video Growth Systems</div>
+<div style="font-family:'Montserrat',sans-serif;font-weight:800;font-size:1rem;color:#4CAF50;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Funded By Others</div>
 """, unsafe_allow_html=True)
     st.sidebar.markdown("## 📊 Deal Summary")
     st.sidebar.markdown(f"**Acquisition:** {fmt(total_acq)}")
@@ -179,7 +179,7 @@ def sidebar_summary(data: dict) -> None:
 st.markdown("""
 <div class="vgs-header">
     <div>
-        <div class="vgs-header-brand">Video Growth Systems</div>
+        <div class="vgs-header-brand">Funded By Others</div>
         <div class="vgs-header-tagline">FBO Pitch Deck Generator — Funded By Others</div>
     </div>
 </div>
@@ -552,6 +552,6 @@ else:
 st.markdown("""
 <br>
 <div style="text-align:center; font-family:'Lato',sans-serif; font-size:0.8rem; color:#2C3E50; opacity:0.6; padding-top:20px;">
-    Powered by <strong>Video Growth Systems</strong> · videogrowthsystems.com
+    Powered by <strong>Funded By Others</strong> · videogrowthsystems.com
 </div>
 """, unsafe_allow_html=True)
