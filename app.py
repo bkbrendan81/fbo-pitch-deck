@@ -21,23 +21,36 @@ st.set_page_config(
 # Branding — Google Fonts + custom CSS
 # ─────────────────────────────────────────────
 st.markdown("""
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@1,800&family=Source+Serif+4:wght@400;700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
 <style>
     /* Global font */
     html, body, [class*="css"] {
         font-family: 'Lato', sans-serif;
     }
 
-    /* Page headings */
-    h1, h2, h3 {
+    /* Display headings — Montserrat Extra Bold Italic per brand kit */
+    h1, h2 {
         font-family: 'Montserrat', sans-serif !important;
         font-weight: 800 !important;
+        font-style: italic !important;
+        letter-spacing: 0.07em !important;
+        color: #4CAF50 !important;
+    }
+
+    /* Section subheads — Source Serif per brand kit */
+    h3, h4 {
+        font-family: 'Source Serif 4', serif !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.075em !important;
+        text-transform: uppercase !important;
         color: #2C3E50 !important;
     }
 
     /* Sidebar header */
     section[data-testid="stSidebar"] h2 {
         font-family: 'Montserrat', sans-serif !important;
+        font-style: italic !important;
+        letter-spacing: 0.07em !important;
         color: #4CAF50 !important;
     }
 
@@ -54,9 +67,10 @@ st.markdown("""
     .vgs-header-brand {
         font-family: 'Montserrat', sans-serif;
         font-weight: 800;
+        font-style: italic;
         font-size: 1.5rem;
         color: #4CAF50;
-        letter-spacing: 0.04em;
+        letter-spacing: 0.07em;
         text-transform: uppercase;
     }
     .vgs-header-tagline {
@@ -552,6 +566,6 @@ else:
 st.markdown("""
 <br>
 <div style="text-align:center; font-family:'Lato',sans-serif; font-size:0.8rem; color:#2C3E50; opacity:0.6; padding-top:20px;">
-    Powered by <strong>Funded By Others</strong> · videogrowthsystems.com
+    Powered by <strong>Funded By Others</strong>
 </div>
 """, unsafe_allow_html=True)
