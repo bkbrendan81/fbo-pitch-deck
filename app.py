@@ -4,6 +4,7 @@ Fill in your deal details and download a ready-to-present PPTX in one click.
 """
 
 import os
+import json
 import streamlit as st
 from generate_deck import generate_deck
 
@@ -16,6 +17,38 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# ─────────────────────────────────────────────
+# Restore a previously-saved deal / profile.
+# Must run before any widget is created so values populate cleanly.
+# ─────────────────────────────────────────────
+_DERIVED_KEYS = {"full_address", "street_address_short", "operator_split",
+                 "total_hold_months", "deals", "comps", "_design"}
+
+if "_pending_load" in st.session_state:
+    _payload = st.session_state.pop("_pending_load")
+    for _k, _v in _payload.items():
+        if _k not in _DERIVED_KEYS:
+            st.session_state[_k] = _v
+    for _i, _d in enumerate(_payload.get("deals") or []):
+        st.session_state[f"d{_i}_street"]   = _d.get("street", "")
+        st.session_state[f"d{_i}_city"]     = _d.get("city_state", "")
+        st.session_state[f"d{_i}_year"]     = _d.get("year", "")
+        st.session_state[f"d{_i}_hold"]     = _d.get("hold_months", "")
+        st.session_state[f"d{_i}_purchase"] = int(_d.get("purchase_price", 0) or 0)
+        st.session_state[f"d{_i}_rehab"]    = int(_d.get("rehab_costs", 0) or 0)
+        st.session_state[f"d{_i}_sale"]     = int(_d.get("sale_price", 0) or 0)
+    for _i, _c in enumerate(_payload.get("comps") or []):
+        st.session_state[f"comp{_i}_addr"]  = _c.get("address", "")
+        st.session_state[f"comp{_i}_cs"]    = _c.get("city_state", "")
+        st.session_state[f"comp{_i}_date"]  = _c.get("sold_date", "")
+        st.session_state[f"comp{_i}_beds"]  = _c.get("bedrooms", "")
+        st.session_state[f"comp{_i}_baths"] = _c.get("baths", "")
+        st.session_state[f"comp{_i}_gar"]   = _c.get("garage", "")
+        st.session_state[f"comp{_i}_dom"]   = _c.get("dom", "")
+        st.session_state[f"comp{_i}_sale"]  = int(_c.get("sale_price", 0) or 0)
+    if "_design" in _payload:
+        st.session_state["selected_design"] = _payload["_design"]
 
 # ─────────────────────────────────────────────
 # Branding — Google Fonts + custom CSS
@@ -201,6 +234,23 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
+# Save / resume — load a saved deal or investor profile
+# ─────────────────────────────────────────────
+st.sidebar.markdown("### 💾 Save / Resume")
+_uploaded = st.sidebar.file_uploader(
+    "Load a saved deal or profile (JSON)", type="json", key="_loader"
+)
+if _uploaded is not None:
+    _sig = (_uploaded.name, _uploaded.size)
+    if st.session_state.get("_loaded_sig") != _sig:
+        try:
+            st.session_state["_pending_load"] = json.load(_uploaded)
+            st.session_state["_loaded_sig"] = _sig
+            st.rerun()
+        except Exception as exc:
+            st.sidebar.error(f"Couldn't read that file: {exc}")
+
+# ─────────────────────────────────────────────
 # Design selector
 # ─────────────────────────────────────────────
 st.subheader("Step 1 — Choose Your Design")
@@ -221,6 +271,7 @@ selected_design = st.radio(
     design_names,
     horizontal=True,
     label_visibility="collapsed",
+    key="selected_design",
 )
 TEMPLATE_PATH = os.path.join(BASE_DIR, TEMPLATES[selected_design]["file"])
 
@@ -253,14 +304,18 @@ with tabs[0]:
     st.subheader("Cover Slide — Property Details")
     c1, c2 = st.columns(2)
     with c1:
-        street = st.text_input("Street Address", "247 Maple Ridge Drive")
-        city   = st.text_input("City", "Columbus")
-        state  = st.text_input("State", "Ohio")
-        zipcode = st.text_input("Zip Code", "43215")
+        street = st.text_input("Street Address", "247 Maple Ridge Drive", key="street")
+        city   = st.text_input("City", "Columbus", key="city")
+        state  = st.text_input("State", "Ohio", key="state")
+        zipcode = st.text_input("Zip Code", "43215", key="zipcode")
     with c2:
-        prop_type = st.text_input("Property Type", "Single-Family Residential (3BR / 2BA)")
-        exit_strat = st.selectbox("Exit Strategy", ["Flip", "Refinance"])
+        prop_type = st.text_input("Property Type", "Single-Family Residential (3BR / 2BA)", key="property_type")
+        exit_strat = st.selectbox("Exit Strategy", ["Flip", "Refinance"], key="exit_strategy")
 
+    data["street"]   = street
+    data["city"]     = city
+    data["state"]    = state
+    data["zipcode"]  = zipcode
     data["full_address"]       = f"{street}, {city}, {state} {zipcode}"
     data["street_address_short"] = street
     data["property_type"]      = prop_type
@@ -273,17 +328,17 @@ with tabs[1]:
     data["selling_point_1"] = st.text_area(
         "Selling Point 1",
         "Strong ARV-to-cost ratio with 18%+ projected gross profit margin",
-        height=80,
+        height=80, key="selling_point_1",
     )
     data["selling_point_2"] = st.text_area(
         "Selling Point 2",
         "Located in high-demand zip code — comps selling in under 18 days on market",
-        height=80,
+        height=80, key="selling_point_2",
     )
     data["selling_point_3"] = st.text_area(
         "Selling Point 3",
         "Contractor bids secured and permits pre-approved — ready to break ground immediately",
-        height=80,
+        height=80, key="selling_point_3",
     )
 
 # ── Tab 3: About You ───────────────────────────────────────────────────────
@@ -291,29 +346,29 @@ with tabs[2]:
     st.subheader("About You — Slide 4")
     c1, c2 = st.columns(2)
     with c1:
-        data["your_name"] = st.text_input("Full Name", "James R. Mitchell")
-        data["your_role"] = st.text_input("Title / Role", "Managing Partner")
+        data["your_name"] = st.text_input("Full Name", "James R. Mitchell", key="your_name")
+        data["your_role"] = st.text_input("Title / Role", "Managing Partner", key="your_role")
     with c2:
         st.caption("These four statements appear in the credential boxes.")
     data["cred_1"] = st.text_area(
         "Credential Box 1",
         "Over $3.2M in residential transactions closed in the past 4 years across Central Ohio",
-        height=80,
+        height=80, key="cred_1",
     )
     data["cred_2"] = st.text_area(
         "Credential Box 2",
         "12 fix-and-flip projects exited with an average 23% gross profit and zero investor capital losses",
-        height=80,
+        height=80, key="cred_2",
     )
     data["cred_3"] = st.text_area(
         "Credential Box 3",
         "Deep relationships with licensed contractors, title companies, and private lenders for faster closings",
-        height=80,
+        height=80, key="cred_3",
     )
     data["cred_4"] = st.text_area(
         "Credential Box 4",
         "Licensed Ohio Real Estate Agent | Certified Residential Specialist (CRS)",
-        height=80,
+        height=80, key="cred_4",
     )
 
 # ── Tab 4: Track Record ────────────────────────────────────────────────────
@@ -363,9 +418,9 @@ with tabs[4]:
     st.subheader("Purchase Costs — Slide 6")
     c1, c2 = st.columns(2)
     with c1:
-        data["purchase_price"] = st.number_input("Purchase Price ($)", min_value=0, value=180000, step=1000)
-        data["closing_costs"]  = st.number_input("Closing Costs ($)",  min_value=0, value=4500,  step=500)
-        data["financing_fees"] = st.number_input("Financing Fees ($)", min_value=0, value=6300,  step=500)
+        data["purchase_price"] = st.number_input("Purchase Price ($)", min_value=0, value=180000, step=1000, key="purchase_price")
+        data["closing_costs"]  = st.number_input("Closing Costs ($)",  min_value=0, value=4500,  step=500, key="closing_costs")
+        data["financing_fees"] = st.number_input("Financing Fees ($)", min_value=0, value=6300,  step=500, key="financing_fees")
     with c2:
         total_acq = (
             float(data["purchase_price"]) +
@@ -379,18 +434,18 @@ with tabs[5]:
     st.subheader("Renovation Budget — Slide 8")
     c1, c2 = st.columns(2)
     with c1:
-        data["kitchen"]       = st.number_input("Kitchen ($)",              min_value=0, value=18000, step=500)
-        data["appliances"]    = st.number_input("Appliances ($)",           min_value=0, value=4500,  step=500)
-        data["bathrooms"]     = st.number_input("Bathrooms ($)",            min_value=0, value=12000, step=500)
-        data["flooring"]      = st.number_input("Flooring ($)",             min_value=0, value=8500,  step=500)
-        data["windows"]       = st.number_input("Windows ($)",              min_value=0, value=5000,  step=500)
-        data["interior_paint"]= st.number_input("Interior Paint & Trim ($)",min_value=0, value=4000,  step=500)
+        data["kitchen"]       = st.number_input("Kitchen ($)",              min_value=0, value=18000, step=500, key="kitchen")
+        data["appliances"]    = st.number_input("Appliances ($)",           min_value=0, value=4500,  step=500, key="appliances")
+        data["bathrooms"]     = st.number_input("Bathrooms ($)",            min_value=0, value=12000, step=500, key="bathrooms")
+        data["flooring"]      = st.number_input("Flooring ($)",             min_value=0, value=8500,  step=500, key="flooring")
+        data["windows"]       = st.number_input("Windows ($)",              min_value=0, value=5000,  step=500, key="windows")
+        data["interior_paint"]= st.number_input("Interior Paint & Trim ($)",min_value=0, value=4000,  step=500, key="interior_paint")
     with c2:
-        data["hvac"]          = st.number_input("HVAC / Electrical / Plumbing ($)", min_value=0, value=9000,  step=500)
-        data["exterior_paint"]= st.number_input("Exterior Paint ($)",       min_value=0, value=2500,  step=500)
-        data["landscape"]     = st.number_input("Landscape ($)",            min_value=0, value=2000,  step=500)
-        data["contingency"]   = st.number_input("Contingency ($)",          min_value=0, value=4500,  step=500)
-        data["permits"]       = st.number_input("Permits ($)",              min_value=0, value=1200,  step=100)
+        data["hvac"]          = st.number_input("HVAC / Electrical / Plumbing ($)", min_value=0, value=9000,  step=500, key="hvac")
+        data["exterior_paint"]= st.number_input("Exterior Paint ($)",       min_value=0, value=2500,  step=500, key="exterior_paint")
+        data["landscape"]     = st.number_input("Landscape ($)",            min_value=0, value=2000,  step=500, key="landscape")
+        data["contingency"]   = st.number_input("Contingency ($)",          min_value=0, value=4500,  step=500, key="contingency")
+        data["permits"]       = st.number_input("Permits ($)",              min_value=0, value=1200,  step=100, key="permits")
         rehab_keys = ["kitchen","appliances","bathrooms","flooring","windows",
                       "interior_paint","hvac","exterior_paint","landscape",
                       "contingency","permits"]
@@ -402,12 +457,12 @@ with tabs[6]:
     st.subheader("Holding & Soft Costs — Slide 9")
     c1, c2 = st.columns(2)
     with c1:
-        data["taxes"]         = st.number_input("Taxes ($)",          min_value=0, value=1800,  step=100)
-        data["insurance"]     = st.number_input("Insurance ($)",      min_value=0, value=950,   step=100)
-        data["utilities"]     = st.number_input("Utilities ($)",      min_value=0, value=1400,  step=100)
+        data["taxes"]         = st.number_input("Taxes ($)",          min_value=0, value=1800,  step=100, key="taxes")
+        data["insurance"]     = st.number_input("Insurance ($)",      min_value=0, value=950,   step=100, key="insurance")
+        data["utilities"]     = st.number_input("Utilities ($)",      min_value=0, value=1400,  step=100, key="utilities")
     with c2:
-        data["maintenance"]   = st.number_input("Maintenance ($)",    min_value=0, value=600,   step=100)
-        data["interest_carry"]= st.number_input("Interest Carry ($)", min_value=0, value=7560,  step=100)
+        data["maintenance"]   = st.number_input("Maintenance ($)",    min_value=0, value=600,   step=100, key="maintenance")
+        data["interest_carry"]= st.number_input("Interest Carry ($)", min_value=0, value=7560,  step=100, key="interest_carry")
         holding_keys = ["taxes","insurance","utilities","maintenance","interest_carry"]
         total_h = sum(float(data.get(k, 0) or 0) for k in holding_keys)
         st.metric("Total Holding Cost", f"${total_h:,.0f}")
@@ -417,7 +472,8 @@ with tabs[7]:
     st.subheader("After Repair Value & Comparable Sales — Slides 11 & 13")
     data["arv"] = st.number_input(
         "Target Sale Price / ARV ($)", min_value=0, value=325000, step=1000,
-        help="This appears on the ARV slide and drives all profit calculations."
+        help="This appears on the ARV slide and drives all profit calculations.",
+        key="arv",
     )
 
     st.markdown("#### Neighborhood Comps (up to 5)")
@@ -455,24 +511,24 @@ with tabs[8]:
     st.markdown("**Why this property is a good investment:**")
     data["prop_reason_1"] = st.text_area("Reason 1",
         "Strong bones — roof replaced 2018, foundation inspection cleared, no structural concerns.",
-        height=80)
+        height=80, key="prop_reason_1")
     data["prop_reason_2"] = st.text_area("Reason 2",
         "3BR/2BA layout is the most in-demand configuration in this price range, maximizing buyer pool.",
-        height=80)
+        height=80, key="prop_reason_2")
     data["prop_reason_3"] = st.text_area("Reason 3",
         "Cosmetic-heavy rehab keeps costs predictable with minimal risk of hidden structural surprises.",
-        height=80)
+        height=80, key="prop_reason_3")
 
     st.markdown("**Why this location is a good investment:**")
     data["loc_reason_1"] = st.text_area("Location Reason 1",
         "Columbus metro area is among the top 5 fastest-growing markets in the Midwest with 3.2% YoY population growth.",
-        height=80)
+        height=80, key="loc_reason_1")
     data["loc_reason_2"] = st.text_area("Location Reason 2",
         "Top-rated school district with an 8/10 GreatSchools rating — a major driver for family buyers.",
-        height=80)
+        height=80, key="loc_reason_2")
     data["loc_reason_3"] = st.text_area("Location Reason 3",
         "Average days on market for comps in this zip code is under 18 days, reflecting strong buyer demand.",
-        height=80)
+        height=80, key="loc_reason_3")
 
 # ── Tab 10: Investor Structure ─────────────────────────────────────────────
 with tabs[9]:
@@ -480,9 +536,10 @@ with tabs[9]:
     c1, c2 = st.columns(2)
     with c1:
         data["capital_needed"] = st.number_input(
-            "Capital Needed from Investor ($)", min_value=0, value=190800, step=1000
+            "Capital Needed from Investor ($)", min_value=0, value=190800, step=1000,
+            key="capital_needed",
         )
-        data["investor_split"] = st.slider("Investor Split (%)", 0, 100, 50, 5)
+        data["investor_split"] = st.slider("Investor Split (%)", 0, 100, 50, 5, key="investor_split")
         data["operator_split"] = 100 - data["investor_split"]
         st.caption(f"Operator split: {data['operator_split']}%")
     with c2:
@@ -507,9 +564,9 @@ with tabs[10]:
     st.subheader("Exit Strategy & Timeline — Slide 16")
     c1, c2, c3 = st.columns(3)
     with c1:
-        data["reno_months"] = st.number_input("Renovation Timeline (Months)", min_value=1, value=4)
+        data["reno_months"] = st.number_input("Renovation Timeline (Months)", min_value=1, value=4, key="reno_months")
     with c2:
-        data["list_sell_months"] = st.number_input("List & Sell Timeframe (Months)", min_value=1, value=2)
+        data["list_sell_months"] = st.number_input("List & Sell Timeframe (Months)", min_value=1, value=2, key="list_sell_months")
     with c3:
         data["total_hold_months"] = int(data["reno_months"]) + int(data["list_sell_months"])
         st.metric("Total Estimated Hold", f"{data['total_hold_months']} months")
@@ -519,18 +576,96 @@ with tabs[11]:
     st.subheader("Contact Information — Slide 17")
     c1, c2 = st.columns(2)
     with c1:
-        data["phone"]            = st.text_input("Phone Number", "(614) 555-0192")
-        data["email"]            = st.text_input("Email", "james@mitchellreinvestments.com")
-        data["website"]          = st.text_input("Website", "www.mitchellreinvestments.com")
+        data["phone"]            = st.text_input("Phone Number", "(614) 555-0192", key="phone")
+        data["email"]            = st.text_input("Email", "james@mitchellreinvestments.com", key="email")
+        data["website"]          = st.text_input("Website", "www.mitchellreinvestments.com", key="website")
     with c2:
-        data["business_location"]  = st.text_input("Business Location", "1200 Dublin Rd, Suite 210, Columbus, OH 43215")
-        data["office_hours_days"]  = st.text_input("Office Hours — Days", "Monday-Friday")
-        data["office_hours_times"] = st.text_input("Office Hours — Times", "09.00-17.00")
+        data["business_location"]  = st.text_input("Business Location", "1200 Dublin Rd, Suite 210, Columbus, OH 43215", key="business_location")
+        data["office_hours_days"]  = st.text_input("Office Hours — Days", "Monday-Friday", key="office_hours_days")
+        data["office_hours_times"] = st.text_input("Office Hours — Times", "09.00-17.00", key="office_hours_times")
 
 # ─────────────────────────────────────────────
 # Live sidebar summary
 # ─────────────────────────────────────────────
 sidebar_summary(data)
+
+# ─────────────────────────────────────────────
+# Pre-generation sanity check
+# ─────────────────────────────────────────────
+_STOCK_CONTACT = {
+    "phone": "(614) 555-0192",
+    "email": "james@mitchellreinvestments.com",
+    "website": "www.mitchellreinvestments.com",
+    "business_location": "1200 Dublin Rd, Suite 210, Columbus, OH 43215",
+}
+
+
+def sanity_warnings(d: dict) -> list[str]:
+    warnings: list[str] = []
+    rehab_k = ["kitchen","appliances","bathrooms","flooring","windows",
+               "interior_paint","hvac","exterior_paint","landscape",
+               "contingency","permits"]
+    holding_k = ["taxes","insurance","utilities","maintenance","interest_carry"]
+    total_cost = (
+        float(d.get("purchase_price", 0) or 0)
+        + float(d.get("closing_costs", 0) or 0)
+        + float(d.get("financing_fees", 0) or 0)
+        + sum(float(d.get(k, 0) or 0) for k in rehab_k + holding_k)
+    )
+    arv = float(d.get("arv", 0) or 0)
+    if arv <= total_cost:
+        warnings.append(
+            f"This deal shows no profit — ARV ({arv:,.0f}) is at or below "
+            f"total project cost ({total_cost:,.0f})."
+        )
+    if float(d.get("capital_needed", 0) or 0) > total_cost > 0:
+        warnings.append(
+            "Capital needed from the investor is larger than the total project "
+            "cost — double-check the raise amount."
+        )
+    stale = [name for name, default in _STOCK_CONTACT.items()
+             if str(d.get(name, "")).strip() == default]
+    if stale:
+        warnings.append(
+            "Contact info still uses the sample defaults: "
+            + ", ".join(s.replace("_", " ") for s in stale)
+            + "."
+        )
+    return warnings
+
+
+# ─────────────────────────────────────────────
+# Save / resume — download the current deal or profile
+# ─────────────────────────────────────────────
+st.divider()
+with st.expander("💾 Save your progress (so you can finish later)"):
+    _addr_slug = data.get("full_address", "deal").replace(", ", "_").replace(" ", "_")[:40]
+    _full_state = dict(data)
+    _full_state["_design"] = selected_design
+    sc1, sc2 = st.columns(2)
+    with sc1:
+        st.download_button(
+            "Save this deal (JSON)",
+            data=json.dumps(_full_state, indent=2),
+            file_name=f"{_addr_slug}_deal.json",
+            mime="application/json",
+            use_container_width=True,
+        )
+        st.caption("Everything you entered. Reload it later via the sidebar.")
+    with sc2:
+        _profile_keys = ["your_name", "your_role", "cred_1", "cred_2", "cred_3",
+                         "cred_4", "phone", "email", "website",
+                         "business_location", "office_hours_days",
+                         "office_hours_times", "deals"]
+        _profile = {k: data[k] for k in _profile_keys if k in data}
+        st.download_button(
+            "Save my investor profile (JSON)",
+            data=json.dumps(_profile, indent=2),
+            file_name="fbo_investor_profile.json",
+            mime="application/json",
+            use_container_width=True,
+        )
+        st.caption("Just your bio, credentials, contact & track record — reuse on every deal.")
 
 # ─────────────────────────────────────────────
 # Generate button
@@ -544,11 +679,20 @@ else:
     st.markdown(f"*Generating with: **{selected_design}***")
     if st.button("Generate Deck", type="primary", use_container_width=True):
         with st.spinner("Building your deck…"):
-            pptx_bytes = generate_deck(TEMPLATE_PATH, data)
+            pptx_bytes, issues = generate_deck(TEMPLATE_PATH, data)
 
         address_slug = data.get("full_address", "pitch_deck").replace(", ", "_").replace(" ", "_")[:40]
         design_slug = selected_design.split("—")[0].strip().replace(" ", "_")
         filename = f"{address_slug}_{design_slug}_Pitch_Deck.pptx"
+
+        all_warnings = sanity_warnings(data) + [
+            f"Your deck still contains {issue}" for issue in issues
+        ]
+        if all_warnings:
+            st.warning(
+                "**Before you send this to an investor, check these:**\n\n"
+                + "\n".join(f"- {w}" for w in all_warnings)
+            )
 
         st.success("✅ Your deck is ready!")
         st.download_button(

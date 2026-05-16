@@ -4,6 +4,7 @@ Fills the PPTX template with user-supplied data using python-pptx.
 """
 
 from __future__ import annotations
+import re
 from io import BytesIO
 from pptx import Presentation
 
@@ -28,17 +29,31 @@ def _pct(n) -> str:
         return str(n)
 
 
-def _apply_to_frame(text_frame, replacements: dict[str, str]) -> None:
-    """Replace placeholder text inside a text frame, run by run."""
+def _replace_in_text_frame(text_frame, replacements: dict[str, str]) -> None:
+    """Replace placeholders inside a text frame at the paragraph level.
+
+    PowerPoint frequently splits one styled line across several runs, so a
+    placeholder like "Purchase Price: $(XXX,XXX)" may not live in any single
+    run. We assemble the full paragraph text, apply every replacement to that
+    string, and — only if it changed — write the result into the first run and
+    blank the rest. Untouched paragraphs keep their original runs/formatting.
+    """
     for para in text_frame.paragraphs:
+        if not para.runs:
+            continue
         full = "".join(r.text for r in para.runs)
+        new_full = full
         for old, new in replacements.items():
-            if old in full:
-                # Do the replacement on each run, then stop checking this key
-                for run in para.runs:
-                    if old in run.text:
-                        run.text = run.text.replace(old, new)
-                break  # re-assemble full after each successful replacement
+            if old in new_full:
+                new_full = new_full.replace(old, new)
+        if new_full != full:
+            para.runs[0].text = new_full
+            for run in para.runs[1:]:
+                run.text = ""
+
+
+def _apply_to_frame(text_frame, replacements: dict[str, str]) -> None:
+    _replace_in_text_frame(text_frame, replacements)
 
 
 def _set_cell_text(cell, new_text: str) -> None:
@@ -63,6 +78,14 @@ def _set_cell_text(cell, new_text: str) -> None:
 _CRED_PLACEHOLDER = "Credibility, Authority, Short Success Statement"
 
 
+def _shape_text(shape) -> str:
+    if not shape.has_text_frame:
+        return ""
+    return "".join(
+        r.text for p in shape.text_frame.paragraphs for r in p.runs
+    )
+
+
 def _fill_credentials(slide, creds: list[str]) -> None:
     filled = 0
     for shape in _iter_shapes(slide.shapes):
@@ -70,12 +93,11 @@ def _fill_credentials(slide, creds: list[str]) -> None:
             break
         if not shape.has_text_frame:
             continue
-        for para in shape.text_frame.paragraphs:
-            for run in para.runs:
-                if _CRED_PLACEHOLDER in run.text:
-                    run.text = run.text.replace(_CRED_PLACEHOLDER, creds[filled])
-                    filled += 1
-                    break
+        if _CRED_PLACEHOLDER in _shape_text(shape):
+            _replace_in_text_frame(
+                shape.text_frame, {_CRED_PLACEHOLDER: creds[filled]}
+            )
+            filled += 1
 
 
 # ---------------------------------------------------------------------------
@@ -118,11 +140,7 @@ def _fill_track_record(table, deals: list[dict]) -> None:
 
         for col_i, (tmpl_val, user_val) in enumerate(zip(tmpl, user_row)):
             cell = table.cell(tbl_row_idx, col_i)
-            # Replace the template value with the user value
-            for para in cell.text_frame.paragraphs:
-                for run in para.runs:
-                    if tmpl_val in run.text:
-                        run.text = run.text.replace(tmpl_val, user_val)
+            _replace_in_text_frame(cell.text_frame, {tmpl_val: user_val})
 
 
 # ---------------------------------------------------------------------------
@@ -159,10 +177,7 @@ def _fill_comps(table, comps: list[dict]) -> None:
 
         for col_i, (tmpl_val, user_val) in enumerate(zip(tmpl, user_row)):
             cell = table.cell(tbl_row_idx, col_i)
-            for para in cell.text_frame.paragraphs:
-                for run in para.runs:
-                    if tmpl_val in run.text:
-                        run.text = run.text.replace(tmpl_val, user_val)
+            _replace_in_text_frame(cell.text_frame, {tmpl_val: user_val})
 
 
 # ---------------------------------------------------------------------------
@@ -179,13 +194,72 @@ def _iter_shapes(shapes):
 
 
 # ---------------------------------------------------------------------------
+# Post-generation audit — catch anything that didn't get filled in
+# ---------------------------------------------------------------------------
+
+_RESIDUE_PATTERNS = [
+    (re.compile(r"\$\([Xx,]+\)"),                 "an unfilled dollar amount, e.g. $(XXX,XXX)"),
+    (re.compile(r"\([Xx]+\)\s*(?:months|month ROI)?"), "an unfilled number, e.g. (X) months"),
+    (re.compile(r"\(XX\)%"),                      "an unfilled percentage split"),
+    (re.compile(r"\(Your Name\)"),               "the (Your Name) placeholder"),
+    (re.compile(r"\(Selling Point"),             "an unfilled selling point"),
+    (re.compile(r"\(Exit Strategy\)"),           "the (Exit Strategy) placeholder"),
+]
+
+_STOCK_TOKENS = [
+    "reallygreatsite.com",
+    "123 Anywhere St",
+    "123-456-7890",
+    "Credibility, Authority, Short Success Statement",
+]
+
+# Sample addresses/cities from the example track-record and comps tables.
+_SAMPLE_TOKENS = sorted({
+    row[0] for row in _TRACK_TEMPLATE
+} | {
+    row[1] for row in _TRACK_TEMPLATE
+} | {
+    row[0] for row in _COMPS_TEMPLATE
+})
+
+
+def _audit_deck(prs) -> list[str]:
+    """Scan the finished deck for placeholders / stock content that slipped
+    through, so the app can warn the member before they send it to investors."""
+    found: set[str] = set()
+    for slide in prs.slides:
+        for shape in _iter_shapes(slide.shapes):
+            texts: list[str] = []
+            if shape.has_text_frame:
+                texts.append(_shape_text(shape))
+            if shape.has_table:
+                for row in shape.table.rows:
+                    for cell in row.cells:
+                        texts.append(cell.text)
+            blob = "\n".join(texts)
+            if not blob:
+                continue
+            for pattern, label in _RESIDUE_PATTERNS:
+                if pattern.search(blob):
+                    found.add(label)
+            for token in _STOCK_TOKENS:
+                if token in blob:
+                    found.add(f'leftover sample text: "{token}"')
+            for token in _SAMPLE_TOKENS:
+                if token in blob:
+                    found.add(f'a sample track-record/comp row still showing "{token}"')
+    return sorted(found)
+
+
+# ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
 
-def generate_deck(template_path: str, data: dict) -> BytesIO:
+def generate_deck(template_path: str, data: dict) -> tuple[BytesIO, list[str]]:
     """
-    Open the template, fill in all placeholders, and return the result as
-    a BytesIO object ready for download.
+    Open the template, fill in all placeholders, and return the result as a
+    BytesIO object ready for download, plus a list of audit issues (any
+    placeholders or stock content that didn't get filled in).
     """
     prs = Presentation(template_path)
 
@@ -390,9 +464,11 @@ def generate_deck(template_path: str, data: dict) -> BytesIO:
             _fill_credentials(slide, creds)
 
     # ------------------------------------------------------------------
-    # Save and return
+    # Audit, save, and return
     # ------------------------------------------------------------------
+    issues = _audit_deck(prs)
+
     output = BytesIO()
     prs.save(output)
     output.seek(0)
-    return output
+    return output, issues
